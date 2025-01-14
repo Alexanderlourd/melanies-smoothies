@@ -1,36 +1,32 @@
-# Import python packages
-import streamlit
+import streamlit as st
 from snowflake.snowpark.functions import col
 
-# Write directly to the app
-streamlit.title(":cup_with_straw: Customise Your Smoothie! :cup_with_straw:")
-streamlit.write(
-    """Choose the fruits you want in your custom Smoothie! 
-    """)
+# Streamlit title and description
+st.title(":cup_with_straw: Customise Your Smoothie! :cup_with_straw:")
+st.write("Choose the fruits you want in your custom Smoothie!")
 
-name_on_order = streamlit.text_input("Name on Smoothie:")
-streamlit.write("The name of your Smoothie will be:", name_on_order)
+# Input for name on smoothie
+name_on_order = st.text_input("Name on Smoothie:")
+st.write("The name of your Smoothie will be:", name_on_order)
 
-cnx = streamlit.connection("snowflake")
+# Snowflake connection
+cnx = st.connection("snowflake")
 session = cnx.session()
-my_dataframe = session.table("smoothies.public.fruit_options").select(col('FRUIT_NAME'))
 
-ingredients_list = streamlit.multiselect('Choose up to 5 ingredients:', my_dataframe, max_selections=5)
+# Fetch available fruits
+fruit_names = session.table("smoothies.public.fruit_options").select(col('FRUIT_NAME')).collect()
+fruit_list = [row['FRUIT_NAME'] for row in fruit_names]
+
+# Multiselect for ingredients
+ingredients_list = st.multiselect('Choose up to 5 ingredients:', fruit_list, max_selections=5)
+
 if ingredients_list:
+    ingredient_string = ' '.join(ingredients_list)
+    st.write("Your selected ingredients are:", ingredient_string)
 
-    ingredient_string = ''
-    for fruit_chosen in ingredients_list:
-        ingredient_string += fruit_chosen + ' '
-    
-    streamlit.write(ingredient_string)
-    my_insert_stmt = """ insert into smoothies.public.orders(ingredients, name_on_order) values 
-                    ('""" + ingredient_string + """','""" + name_on_order + """')"""
+    # Button to submit the order
+    time_to_insert = st.button('Submit Order')
 
-    time_to_insert = streamlit.button('Submit Order')
-    streamlit.write(my_insert_stmt)
-    # streamlit.stop()
-    
     if time_to_insert:
-        session.sql(my_insert_stmt).collect()
-
-        streamlit.success("""Your Smoothie is ordered, '""" + name_on_order + """'!""", icon = "\u2611")
+        session.table("smoothies.public.orders").insert([ingredient_string, name_on_order]).collect()
+        st.success(f"Your Smoothie is ordered, '{name_on_order}'!", icon="\u2611")
